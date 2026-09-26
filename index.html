@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Proyector Bíblico RV</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a0a0a">
@@ -30,6 +30,13 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  /* La página no se agranda ni se achica y solo se mueve hacia arriba/abajo */
+  html,body{
+    max-width:100%;overflow-x:hidden;overflow-x:clip;
+    touch-action:pan-x pan-y;            /* sin pellizco ni doble toque para zoom */
+    -webkit-text-size-adjust:100%;text-size-adjust:100%;
+  }
+  .quick-images-strip{touch-action:pan-x pan-y;}
   body{
     background:var(--bg);
     color:var(--text);
@@ -44,14 +51,51 @@
   body.projecting .app{max-width:none;padding:0;margin:0;}
   body.projecting #displayPanel{
     position:fixed;inset:0;margin:0;border-radius:0;
-    min-height:100vh;z-index:999;
+    min-height:100vh;z-index:999;padding:18px 24px 66px;
   }
 
   .screen{display:none;}
   .screen.active{display:block;}
 
-  header.top{text-align:center;padding:10px 0 18px;}
+  header.top{text-align:center;padding:10px 0 18px;position:relative;}
   header.top .medal{font-size:2.4rem;line-height:1;}
+  header.top .app-logo{width:58px;height:58px;border-radius:14px;display:block;margin:0 auto;object-fit:cover;}
+  .btn-gear{
+    position:absolute;top:8px;right:0;width:40px;height:40px;border-radius:50%;
+    border:1px solid #3a3a3a;background:var(--field);color:#fff;font-size:1.15rem;
+    cursor:pointer;
+  }
+
+  /* Cuadrícula compacta de acciones: 3 columnas, ícono arriba y texto abajo */
+  .action-grid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0;
+  }
+  .action-btn{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    background:var(--field);border:1px solid #3a3a3a;border-radius:12px;
+    padding:12px 4px;color:#fff;font-family:inherit;cursor:pointer;
+  }
+  .action-btn .ic{font-size:1.3rem;}
+  .action-btn span:last-child{font-size:.72rem;font-weight:600;text-align:center;line-height:1.15;}
+  /* Libro, Capítulo y Versículo en una sola fila: el libro se lleva casi
+     todo el ancho, capítulo y versículo quedan chicos al lado */
+  .field-row-lcv{display:flex;gap:6px;margin-bottom:14px;align-items:flex-end;}
+  .field-row-lcv .col-libro{flex:1;min-width:0;}
+  .field-row-lcv .col-cap, .field-row-lcv .col-ver{flex:0 0 52px;}
+  .field-row-lcv .selectbtn{padding-left:8px;padding-right:6px;}
+  .field-row-lcv .col-libro #libroNombre{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;min-width:0;flex:1;
+  }
+  .field-row-lcv .col-cap .selectbtn, .field-row-lcv .col-ver .selectbtn{
+    justify-content:center;gap:2px;padding-left:4px;padding-right:4px;
+  }
+  /* Botones de tamaño de letra (+/-), compactos, mismo alto que los selectbtn */
+  .field-row-lcv .col-size{flex:0 0 84px;}
+  .size-mini{display:flex;gap:4px;}
+  .size-mini-btn{
+    flex:1;height:47px;border-radius:12px;border:1px solid #3a3a3a;
+    background:var(--field);color:#fff;font-size:1.2rem;font-weight:700;cursor:pointer;
+  }
   header.top h1{font-size:1.25rem;margin:6px 0 0;font-weight:700;}
 
   input[type=text], textarea, select{
@@ -66,9 +110,66 @@
   }
   input::placeholder, textarea::placeholder{color:var(--muted);}
 
-  .search-bar{position:relative;margin-bottom:16px;}
-  .search-bar input{padding-left:38px;}
-  .search-bar .ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);}
+  /* Fila: barra de búsqueda (más pequeña) + botón de teclado */
+  .search-row{display:flex;gap:8px;align-items:stretch;margin-bottom:16px;}
+  .search-bar{position:relative;flex:1;margin-bottom:0;}
+  .search-bar input{padding-left:34px;padding-top:11px;padding-bottom:11px;font-size:.92rem;}
+  .search-bar .ico{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;}
+  .btn-teclado{
+    flex-shrink:0;width:52px;border:none;border-radius:var(--radius);
+    background:var(--darkbtn-2);color:#fff;font-size:1.3rem;cursor:pointer;
+  }
+  .btn-teclado.abierto{background:var(--blue);}
+
+  /* Teclado rápido de libros */
+  .teclado-libros{
+    background:#1a1a1a;border-radius:var(--radius);padding:12px;margin-bottom:16px;
+  }
+  /* Un solo teclado: números arriba, letras debajo, guion y borrar al final */
+  .teclado-letras{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;max-width:360px;margin:0 auto;}
+  .tecla{
+    height:34px;padding:0;border:none;border-radius:8px;background:var(--darkbtn-2);
+    color:#fff;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;
+  }
+  .tecla.tecla-num{background:#2a3440;}
+  .tecla.doble{grid-column:span 2;}
+  .tecla.activa{background:var(--blue);}
+  .tecla.vacia{opacity:.3;}
+  .teclado-resultados{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;}
+  .teclado-resultados:empty{margin-top:0;}
+  /* Libros que coinciden: tres por línea, cada uno con su color */
+  .libro-resultado{
+    --c:#fff;
+    border:none;border-radius:9px;padding:9px 4px;background:#252525;color:var(--c);
+    font-family:inherit;font-size:.82rem;font-weight:700;text-align:center;cursor:pointer;
+    line-height:1.15;
+  }
+  .libro-resultado.largo{font-size:.7rem;letter-spacing:-.2px;padding-left:2px;padding-right:2px;}
+  .libro-resultado.actual{background:#1c2f40;box-shadow:inset 0 0 0 2px var(--c);}
+  .teclado-resultados .teclado-vacio{grid-column:1 / -1;}
+  .teclado-vacio{color:var(--muted);font-size:.85rem;text-align:center;padding:8px 0;}
+  /* Pantallita donde se ve lo que se va escribiendo (ej. "Marcos 1-1") */
+  .teclado-pantalla{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:#0f0f0f;border-radius:10px;padding:10px 12px;margin-bottom:10px;min-height:46px;
+  }
+  .teclado-texto{font-size:1.15rem;font-weight:700;color:#fff;letter-spacing:.3px;}
+  .teclado-texto.pista{font-size:.85rem;font-weight:400;color:var(--muted);letter-spacing:0;}
+  .teclado-texto .cursor{display:inline-block;width:2px;height:1.1em;background:var(--blue);margin-left:2px;vertical-align:-2px;animation:parpadeo 1s steps(1) infinite;}
+  @keyframes parpadeo{50%{opacity:0;}}
+  @media (prefers-reduced-motion: reduce){ .teclado-texto .cursor{animation:none;} }
+  .teclado-limpiar{border:none;background:none;color:var(--muted);font-size:.8rem;cursor:pointer;padding:4px 6px;flex-shrink:0;}
+  .tecla.tecla-guion{background:#3d3d3d;}
+  .tecla.tecla-borrar{background:#3d3d3d;}
+  .tecla:disabled{opacity:.3;cursor:default;}
+  .tecla:focus-visible, .libro-resultado:focus-visible, .teclado-ir:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+  .teclado-ir{
+    width:100%;margin-top:10px;border:none;border-radius:10px;padding:12px;background:var(--blue);
+    color:#fff;font-family:inherit;font-size:1rem;font-weight:700;cursor:pointer;
+  }
+  .teclado-ir:disabled{opacity:.4;cursor:default;}
+  .teclado-msg{min-height:1.1em;color:#ff8b8b;font-size:.85rem;text-align:center;margin-top:8px;}
+  .teclado-msg:empty{min-height:0;margin-top:0;}
 
   label.field-label{display:block;color:var(--muted);font-size:.92rem;margin:0 0 6px;}
   .field-block{margin-bottom:14px;}
@@ -113,7 +214,75 @@
   }
   #displayRef{color:#4fa8e0;font-size:1rem;margin-top:12px;font-weight:600;}
   #displayEmpty{color:#5a5a5a;font-size:1.05rem;}
-  .display-controls{display:flex;gap:12px;align-items:center;margin-top:20px;width:100%;justify-content:center;}
+  .display-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:20px;width:100%;justify-content:center;}
+  .display-controls .icon-btn{width:42px;height:42px;}
+  /* En pantalla completa: los controles se van a la esquina para dejar
+     todo el espacio al versículo */
+  body.projecting #displayControls{
+    position:fixed;right:12px;bottom:12px;width:auto;margin:0;
+    gap:8px;justify-content:flex-end;z-index:6;opacity:.9;
+  }
+  body.projecting #displayControls .btn{padding:8px 14px;font-size:.85rem;}
+  body.projecting #displayControls .icon-btn{width:38px;height:38px;font-size:1rem;}
+
+  /* ---- Imágenes: galería y acceso rápido ---- */
+  .images-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px;}
+  .image-card{position:relative;border-radius:var(--radius);overflow:hidden;background:#1c1c1c;border:2px solid transparent;}
+  .image-card.selected{border-color:var(--green);}
+  .image-card img{width:100%;height:120px;object-fit:cover;display:block;}
+  .image-card .image-actions{display:flex;gap:6px;padding:8px;}
+  .image-card .image-actions button{
+    flex:1;border:none;border-radius:8px;padding:8px 6px;font-family:inherit;
+    font-size:.82rem;font-weight:600;color:#fff;background:var(--darkbtn-2);
+  }
+  .image-card .image-actions .del{background:#7a2222;}
+
+  .quick-images{margin:2px 0 12px;}
+  .quick-images-label{font-size:.74rem;color:#8a8a8a;margin-top:8px;text-align:center;}
+  .quick-images-strip{display:flex;flex-wrap:wrap;gap:8px;}
+  .quick-thumb{
+    position:relative;width:58px;height:58px;border-radius:10px;overflow:hidden;
+    flex-shrink:0;border:2px solid #3a3a3a;background:#1c1c1c;
+  }
+  .quick-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .quick-thumb .num{
+    position:absolute;top:0;left:0;background:rgba(0,0,0,.66);color:#fff;
+    font-size:.66rem;font-weight:700;padding:1px 5px;border-radius:0 0 6px 0;
+  }
+  .quick-thumb.active{border-color:var(--green);}
+  .quick-thumb.active::after{
+    content:'';position:absolute;inset:0;border:2px solid var(--green);border-radius:8px;
+  }
+  /* Miniatura "0": vuelve al versículo/canción proyectado */
+  .quick-thumb.thumb-cero{
+    display:flex;align-items:center;justify-content:center;
+    background:#000;color:#fff;border-color:#555;
+  }
+  .quick-thumb.thumb-cero .cero-icono{font-size:1.15rem;line-height:1;}
+  .quick-thumb.thumb-cero .num{background:rgba(255,255,255,.18);}
+
+  /* Miniaturas dentro del panel de proyección */
+  .panel-images{margin-top:12px;width:100%;}
+  .panel-images .quick-images-strip{justify-content:center;}
+  .panel-images .quick-thumb{width:46px;height:46px;opacity:.85;}
+  .panel-images .quick-thumb.active{opacity:1;}
+  body.projecting .panel-images{
+    position:fixed;left:0;bottom:12px;margin:0;padding:0 14px;z-index:5;
+    width:auto;max-width:calc(100vw - 190px);
+  }
+  body.projecting .panel-images .quick-images-strip{justify-content:flex-start;}
+  body.projecting .panel-images .quick-thumb{width:40px;height:40px;}
+
+  /* La imagen proyectada */
+  #displayImage{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}
+  body.projecting.showing-image #displayPanel{justify-content:center;padding:0;}
+  body.projecting.showing-image #displayImage{
+    max-width:100vw;max-height:100vh;width:auto;height:auto;
+    object-fit:contain;border-radius:0;
+  }
+  body.projecting.showing-image #displayRef,
+  body.projecting.showing-image #displayControls{display:none !important;}
+
   .display-controls .btn{margin:0;width:auto;padding:12px 20px;}
   .icon-btn{background:#242424;color:#fff;width:46px;height:46px;border-radius:12px;font-size:1.15rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 
@@ -201,7 +370,23 @@
   .share-opt{background:#242424;border-radius:14px;padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:8px;color:#fff;font-size:.82rem;}
   .share-opt .ic{font-size:1.5rem;}
 
-  .status{color:var(--muted);font-size:.9rem;text-align:center;margin-bottom:10px;min-height:1.2em;}
+  /* Avisos cortos ("Copiado ✓", "Cargando..."): flotan abajo y no ocupan espacio */
+  .status{
+    position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);
+    max-width:calc(100% - 32px);background:#2b2b2b;color:#fff;border:1px solid #3a3a3a;
+    border-radius:12px;padding:9px 14px;font-size:.85rem;text-align:center;z-index:1000;
+    box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none;
+  }
+  .status:empty{display:none;}
+  /* "Versión:" a la izquierda y "Santa Biblia — ... · sin conexión" a la derecha */
+  .version-linea{display:flex;align-items:baseline;justify-content:flex-start;gap:6px;margin-bottom:8px;}
+  .version-linea .field-label{margin:0;flex-shrink:0;}
+  #translationLabel{color:var(--muted);font-size:.72rem;text-align:left;line-height:1.25;min-width:0;flex:1;white-space:nowrap;overflow:hidden;}
+  /* Versiones pegadas al buscador */
+  .field-block:has(#versionGrid){margin-bottom:10px;}
+  /* Las dos versiones en una sola fila */
+  .version-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .version-grid .selectbtn{padding:12px 4px;font-size:.92rem;white-space:nowrap;justify-content:center;}
 
   ::-webkit-scrollbar{width:6px;}
   ::-webkit-scrollbar-thumb{background:#333;border-radius:4px;}
@@ -214,70 +399,101 @@
   <!-- ============ HOME ============ -->
   <div class="screen active" id="screen-home">
     <header class="top">
-      <div class="medal">🏅</div>
+      <div class="medal"><img class="app-logo" src="icon-192.png" alt="Logo" onerror="this.replaceWith(document.createTextNode('🏅'))"></div>
       <h1>Proyector Bíblico RV</h1>
+      <button class="btn-gear" id="btnAjustes" title="Ajustes de pantalla">⚙</button>
     </header>
 
-    <div class="field-row">
-      <div>
+    <div class="field-block">
+      <div class="version-linea">
         <label class="field-label">Versión:</label>
-        <button class="selectbtn" id="verBtn1909" style="justify-content:center;background:var(--blue);">1 · RV 1909</button>
+        <span id="translationLabel"></span>
       </div>
-      <div>
-        <label class="field-label">&nbsp;</label>
+      <div class="version-grid" id="versionGrid">
+        <button class="selectbtn" id="verBtn1909" style="justify-content:center;background:var(--blue);">1 · RV 1909</button>
         <button class="selectbtn" id="verBtn1960" style="justify-content:center;">2 · RV 1960</button>
       </div>
     </div>
 
     <div class="status" id="status">Cargando Biblia...</div>
 
-    <div class="search-bar">
-      <span class="ico">🔍</span>
-      <input type="text" id="topSearch" placeholder="Buscar palabra o frase..." readonly>
+    <div class="search-row">
+      <div class="search-bar">
+        <span class="ico">🔍</span>
+        <input type="text" id="topSearch" placeholder="Buscar palabra o frase..." readonly>
+      </div>
+      <button class="btn-teclado" id="btnTecladoLibros" title="Buscar libro por letra">⌨</button>
     </div>
 
-    <div class="field-block">
-      <label class="field-label">Libro:</label>
-      <button class="selectbtn" id="btnLibro">
-        <span id="libroNombre">Génesis</span><span class="chev">▾</span>
-      </button>
+    <!-- Teclado rápido: letra(s) del libro + capítulo, guion y versículo. Ej: M → Marcos → 1-1 -->
+    <div class="teclado-libros" id="tecladoLibros" style="display:none;">
+      <div class="teclado-pantalla">
+        <div class="teclado-texto pista" id="tecladoTexto" aria-live="polite">Ejemplo: M → Marcos → 1-1</div>
+        <button class="teclado-limpiar" id="tecladoLimpiar" title="Borrar todo">Borrar todo</button>
+      </div>
+      <div class="teclado-letras" id="tecladoLetras"></div>
+      <div class="teclado-resultados" id="tecladoResultados"></div>
+      <button class="teclado-ir" id="tecladoIr" disabled>Ir al versículo</button>
+      <div class="teclado-msg" id="tecladoMsg"></div>
     </div>
 
-    <div class="field-row">
-      <div>
-        <label class="field-label">Capítulo:</label>
+    <div class="field-row-lcv">
+      <div class="col-libro">
+        <label class="field-label">Libro:</label>
+        <button class="selectbtn" id="btnLibro">
+          <span id="libroNombre">Génesis</span><span class="chev">▾</span>
+        </button>
+      </div>
+      <div class="col-cap">
+        <label class="field-label">Cap.</label>
         <button class="selectbtn" id="btnCapitulo"><span id="capituloNum">1</span><span class="chev">▾</span></button>
       </div>
-      <div>
-        <label class="field-label">Versículo:</label>
+      <div class="col-ver">
+        <label class="field-label">Vers.</label>
         <button class="selectbtn" id="btnVersiculo"><span id="versiculoNum">1</span><span class="chev">▾</span></button>
+      </div>
+      <div class="col-size">
+        <label class="field-label">Letra</label>
+        <div class="size-mini">
+          <button class="size-mini-btn" id="btnAchicar" title="Achicar letra">−</button>
+          <button class="size-mini-btn" id="btnAgrandar" title="Agrandar letra">+</button>
+        </div>
       </div>
     </div>
 
-    <div class="row-btns">
-      <button class="btn btn-half" id="btnAgrandar">+ Agrandar</button>
-      <button class="btn btn-half" id="btnAchicar">− Achicar</button>
-    </div>
-
-    <button class="btn btn-gold" id="btnFavorito">⭐ Guardar en favoritos</button>
-    <button class="btn btn-blue" id="btnBuscar">🔍 Buscar libro o versículo</button>
     <button class="btn btn-green" id="btnProyectar">⤢ Proyectar pantalla completa</button>
 
-    <hr>
+    <div class="action-grid">
+      <button class="action-btn" id="btnFavorito"><span class="ic">⭐</span><span>Favoritos</span></button>
+      <button class="action-btn" id="btnBuscar"><span class="ic">🔍</span><span>Buscar</span></button>
+      <button class="action-btn" id="btnLetras"><span class="ic">♫</span><span>Canciones</span></button>
+      <button class="action-btn" id="btnImagenes"><span class="ic">🖼</span><span>Imágenes</span></button>
+      <button class="action-btn" id="btnFavoritosList"><span class="ic">♡</span><span>Mis Favoritos</span></button>
+      <button class="action-btn" id="btnHistorial"><span class="ic">↻</span><span>Historial</span></button>
+    </div>
 
-    <button class="btn btn-dark" id="btnLetras">♫ Letras de canciones</button>
-    <button class="btn btn-dark" id="btnFavoritosList">♡ Mis Favoritos</button>
-    <button class="btn btn-dark" id="btnHistorial">↻ Historial Reciente</button>
-    <button class="btn btn-dark" id="btnAjustes">⚙ Ajustes de Pantalla</button>
+    <!-- Miniaturas de las imágenes ya subidas: toca una para proyectarla -->
+    <div class="quick-images" id="quickImages" style="display:none;">
+      <div class="quick-images-strip" id="quickImagesStrip"></div>
+      <div class="quick-images-label" id="quickImagesLabel"></div>
+    </div>
 
     <div class="display-panel" id="displayPanel">
       <div id="displayEmpty">Selecciona un versículo para proyectarlo aquí.</div>
       <div id="displayContent" style="display:none;"></div>
+      <img id="displayImage" style="display:none;" alt="">
       <div id="displayRef" style="display:none;"></div>
       <div class="display-controls" id="displayControls" style="display:none;">
         <button class="btn btn-dark" id="btnSalir" style="width:auto;">Entrar</button>
+        <button class="icon-btn" id="btnAchicarProy" title="Achicar letra">−</button>
+        <button class="icon-btn" id="btnAgrandarProy" title="Agrandar letra">+</button>
         <button class="icon-btn" id="btnCopiar" title="Copiar">⧉</button>
         <button class="icon-btn" id="btnCompartir" title="Compartir">↗</button>
+      </div>
+
+      <!-- Miniaturas dentro del panel: cambiar de imagen sin salir de la proyección -->
+      <div class="panel-images" id="panelImages" style="display:none;">
+        <div class="quick-images-strip" id="panelImagesStrip"></div>
       </div>
     </div>
 
@@ -412,6 +628,23 @@
     </div>
   </div>
 
+  <!-- ============ MIS IMÁGENES ============ -->
+  <div class="screen" id="screen-imagenes">
+    <div class="screen-header">
+      <h2>Mis Imágenes</h2>
+      <button class="btn-link" data-go-home>‹ Volver</button>
+    </div>
+
+    <input type="file" id="imageFileInput" accept="image/*" multiple style="display:none;">
+    <button class="btn btn-green" id="btnSubirImagen">⬆ Subir imágenes</button>
+    <div class="hint">Las imágenes quedan guardadas en el teléfono y siguen disponibles aunque cierres la app.</div>
+
+    <div id="imagesEmpty" class="hint" style="text-align:center;margin-top:24px;">
+      Todavía no has subido ninguna imagen.
+    </div>
+    <div class="images-grid" id="imagesGrid"></div>
+  </div>
+
   <!-- ============ PICKER (Libro / Capítulo / Versículo) ============ -->
   <div class="screen" id="screen-picker">
     <div class="screen-header">
@@ -479,7 +712,10 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
       {title:'', lyrics:'', audioUrl:null, audioName:'', marks:[]}
     ],
     currentSong: 0,
-    displayMode: 'verse', // 'verse' | 'song' | 'empty'
+    images: [],         // [{id, name, data}]  data = imagen en base64
+    currentImage: null, // id de la imagen proyectada
+    anterior: null,     // lo que estaba proyectado antes de la imagen
+    displayMode: 'verse', // 'verse' | 'song' | 'image' | 'empty'
     fontSize: 32
   };
 
@@ -488,6 +724,8 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
 
   // ---------- Screen navigation ----------
   function showScreen(id){
+    // Si ya estamos en esa pantalla no se toca el scroll (antes saltaba arriba)
+    if($(id).classList.contains('active')) return;
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     $(id).classList.add('active');
     window.scrollTo(0,0);
@@ -514,11 +752,23 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
     if(!lbl){
       lbl = document.createElement('div');
       lbl.id = 'translationLabel';
-      lbl.style.cssText = 'text-align:center;color:var(--muted);font-size:.8rem;margin-top:-10px;margin-bottom:14px;';
-      document.querySelector('header.top').after(lbl);
+      document.querySelector('.version-linea').appendChild(lbl);
     }
     lbl.textContent = text;
+    ajustarEtiquetaVersion();
   }
+  // Achica un poco la letra si el texto no cabe, para que siempre quede en una sola línea
+  function ajustarEtiquetaVersion(){
+    const lbl = $('translationLabel');
+    if(!lbl || !lbl.offsetWidth) return;
+    let tam = 11.5;                       // ≈ .72rem
+    lbl.style.fontSize = tam + 'px';
+    while(lbl.scrollWidth > lbl.clientWidth && tam > 8){
+      tam -= 0.25;
+      lbl.style.fontSize = tam + 'px';
+    }
+  }
+  window.addEventListener('resize', ajustarEtiquetaVersion);
 
   function init(){
     setStatus('Cargando Biblia...');
@@ -560,6 +810,7 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
     const v = state.verses[state.currentVerseIndex];
     if(!v) return;
     state.displayMode = 'verse';
+    ocultarImagenProyectada();
     $('displayEmpty').style.display = 'none';
     $('displayContent').style.display = 'block';
     $('displayRef').style.display = 'block';
@@ -651,6 +902,8 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
   }
   $('btnAgrandar').addEventListener('click', () => applySize(Math.min(state.fontSize+4, 96)));
   $('btnAchicar').addEventListener('click', () => applySize(Math.max(state.fontSize-4, 12)));
+  $('btnAgrandarProy').addEventListener('click', () => applySize(Math.min(state.fontSize+4, 96)));
+  $('btnAchicarProy').addEventListener('click', () => applySize(Math.max(state.fontSize-4, 12)));
   $('btnAgrandarSong').addEventListener('click', () => applySize(Math.min(state.fontSize+4, 96)));
   $('btnAchicarSong').addEventListener('click', () => applySize(Math.max(state.fontSize-4, 12)));
 
@@ -1100,6 +1353,7 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
     saveCurrentSongForm();
     const s = state.songs[state.currentSong];
     state.displayMode = 'song';
+    ocultarImagenProyectada();
     $('displayEmpty').style.display='none';
     $('displayContent').style.display='block';
     $('displayRef').style.display='block';
@@ -1108,6 +1362,505 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
     $('displayRef').textContent = s.title || `Canción ${state.currentSong+1}`;
     showScreen('screen-home');
   });
+
+  // ---------- Teclado rápido de libros ----------
+  // Se escribe como en papel: letras del libro, luego capítulo, guion y versículo.
+  //   M        -> muestra Miqueas, Malaquías, Mateo, Marcos
+  //   Marcos   -> (toca el libro) queda elegido
+  //   1-1      -> Marcos 1:1
+  // Las letras pueden seguir hasta que quede un solo libro (MAR -> Marcos).
+  // Los números 1, 2 y 3 al principio sirven para "1 Samuel", "3 Juan", etc.
+  const teclado = {
+    prefijo: '',        // lo escrito para el libro, sin espacios ni tildes (ej. "1S", "MAR")
+    libro: null,        // libro elegido
+    numeros: ''         // capítulo y versículo tal como se escriben (ej. "3-16")
+  };
+
+  // Quita tildes y espacios para comparar ("1 Crónicas" -> "1CRONICAS")
+  function sinTildes(txt){
+    return (txt || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  }
+  function claveLibro(b){ return sinTildes(b.commonName).replace(/\s+/g, ''); }
+
+  function candidatos(prefijo){
+    if(!prefijo) return [];
+    return state.books.filter(b => claveLibro(b).startsWith(prefijo));
+  }
+  // El libro al que apunta lo escrito: el elegido, o el único que coincide
+  function libroDestino(){
+    if(teclado.libro) return teclado.libro;
+    const c = candidatos(teclado.prefijo);
+    return c.length === 1 ? c[0] : null;
+  }
+  const tieneLetras = () => /[A-Z]/.test(teclado.prefijo);
+
+  // Libros contra los que se validan los números: el elegido o, si aún no se
+  // eligió, todos los que coinciden con las letras escritas.
+  function librosParaNumeros(){
+    const destino = libroDestino();
+    return destino ? [destino] : candidatos(teclado.prefijo);
+  }
+  function capitulosDe(b){ return b.numberOfChapters || b.chapters.length || 1; }
+  function maxCapitulo(libros){
+    return libros.reduce((m, b) => Math.max(m, capitulosDe(b)), 0);
+  }
+  function maxVersiculo(libros, cap){
+    return libros.reduce((m, b) => Math.max(m, (b.chapters[cap - 1] || []).length), 0);
+  }
+  // ¿Se puede añadir este dígito sin pasarse de los capítulos/versículos que existen?
+  function digitoPermitido(d){
+    const libros = librosParaNumeros();
+    if(!libros.length) return false;
+    const [capTxt, verTxt] = teclado.numeros.split('-');
+    if(verTxt === undefined){
+      const n = parseInt((capTxt || '') + d, 10);
+      return !((capTxt || '') === '' && d === '0') && n >= 1 && n <= maxCapitulo(libros);
+    }
+    const cap = parseInt(capTxt, 10);
+    const n = parseInt(verTxt + d, 10);
+    return !(verTxt === '' && d === '0') && n >= 1 && n <= maxVersiculo(libros, cap);
+  }
+  function guionPermitido(){
+    if(!teclado.numeros || teclado.numeros.includes('-')) return false;
+    const libros = librosParaNumeros();
+    const cap = parseInt(teclado.numeros, 10);
+    return cap >= 1 && cap <= maxCapitulo(libros) && maxVersiculo(libros, cap) > 0;
+  }
+  // Con el libro ya definido las letras se apagan: ahora tocan los números
+  const libroDefinido = () => !!libroDestino();
+  // Todavía se está escribiendo el número del nombre ("1" de 1 Samuel):
+  // no hay letras y el libro aún no queda definido (con "3" ya es 3 Juan)
+  const escribiendoNumeroDelNombre = () => !teclado.libro && !tieneLetras() && !libroDestino();
+
+  function abrirTeclado(){
+    $('tecladoLibros').style.display = 'block';
+    $('btnTecladoLibros').classList.add('abierto');
+    renderTeclado();
+  }
+  function cerrarTeclado(){
+    $('tecladoLibros').style.display = 'none';
+    $('btnTecladoLibros').classList.remove('abierto');
+  }
+  function tecladoAbierto(){ return $('tecladoLibros').style.display !== 'none'; }
+  function limpiarTeclado(){
+    teclado.prefijo = ''; teclado.libro = null; teclado.numeros = '';
+    $('tecladoMsg').textContent = '';
+  }
+
+  $('btnTecladoLibros').addEventListener('click', () => {
+    if(tecladoAbierto()) cerrarTeclado(); else abrirTeclado();
+  });
+  $('tecladoLimpiar').addEventListener('click', () => { limpiarTeclado(); renderTeclado(); });
+  $('tecladoIr').addEventListener('click', irAlVersiculo);
+
+  // ----- Lo que hace cada tecla -----
+  function pulsarLetra(letra){
+    $('tecladoMsg').textContent = '';
+    // Con el libro ya elegido las letras no hacen nada (se usa ⌫ o Borrar todo)
+    if(libroDefinido() || teclado.numeros) return;
+    if(!candidatos(teclado.prefijo + letra).length) return;
+    teclado.prefijo += letra;
+    renderTeclado();
+  }
+
+  function pulsarNumero(d){
+    $('tecladoMsg').textContent = '';
+    // Sin letras todavía: el 1, 2 o 3 es parte del nombre ("1 Samuel")
+    if(escribiendoNumeroDelNombre()){
+      if(teclado.prefijo === '' && candidatos(d).length) teclado.prefijo = d;
+      renderTeclado();
+      return;
+    }
+    // Ya hay libro (o letras): son capítulo / versículo
+    if(!digitoPermitido(d)) return;         // no existe ese capítulo/versículo
+    teclado.numeros += d;
+    renderTeclado();
+  }
+
+  function pulsarGuion(){
+    $('tecladoMsg').textContent = '';
+    if(!guionPermitido()) return;
+    teclado.numeros += '-';
+    renderTeclado();
+  }
+
+  function pulsarBorrar(){
+    $('tecladoMsg').textContent = '';
+    if(teclado.numeros) teclado.numeros = teclado.numeros.slice(0, -1);
+    else if(teclado.libro) teclado.libro = null;           // vuelve a las letras
+    else teclado.prefijo = teclado.prefijo.slice(0, -1);
+    renderTeclado();
+  }
+
+  function elegirLibro(b){
+    $('tecladoMsg').textContent = '';
+    teclado.libro = b;
+    // Si ya escribió los números (M 1-1 y luego Marcos), va directo
+    if(teclado.numeros && !teclado.numeros.endsWith('-')) { irAlVersiculo(); return; }
+    renderTeclado();
+  }
+
+  // ----- Navegar -----
+  function irAlVersiculo(){
+    const libro = libroDestino();
+    const msg = $('tecladoMsg');
+    if(!libro){
+      msg.textContent = teclado.prefijo ? 'Toca el libro que quieres en la lista.' : 'Escribe la letra del libro.';
+      return;
+    }
+    const [capTxt, verTxt] = teclado.numeros.split('-');
+    const totalCaps = libro.numberOfChapters || libro.chapters.length || 1;
+    const cap = capTxt ? parseInt(capTxt, 10) : 1;
+    if(cap < 1 || cap > totalCaps){
+      msg.textContent = `${libro.commonName} tiene ${totalCaps} capítulo${totalCaps === 1 ? '' : 's'}.`;
+      return;
+    }
+    const totalVers = (libro.chapters[cap - 1] || []).length;
+    const ver = verTxt ? parseInt(verTxt, 10) : 1;
+    if(ver < 1 || ver > totalVers){
+      msg.textContent = `${libro.commonName} ${cap} tiene ${totalVers} versículo${totalVers === 1 ? '' : 's'}.`;
+      return;
+    }
+
+    state.currentBook = libro;
+    $('libroNombre').textContent = libro.commonName;
+    loadChapter(cap, false);
+    const idx = state.verses.findIndex(v => v.number === ver);
+    state.currentVerseIndex = idx >= 0 ? idx : 0;
+    $('versiculoNum').textContent = state.verses[state.currentVerseIndex].number;
+    showVerse();
+
+    limpiarTeclado();
+    cerrarTeclado();
+  }
+
+  // ----- Dibujar el teclado -----
+  function crearTecla(texto, clase, alPulsar, habilitada, etiqueta){
+    const t = document.createElement('button');
+    t.className = 'tecla' + (clase ? ' ' + clase : '');
+    t.textContent = texto;
+    if(etiqueta) t.setAttribute('aria-label', etiqueta);
+    t.disabled = !habilitada;
+    if(habilitada) t.addEventListener('click', alPulsar);
+    return t;
+  }
+
+  function renderTeclado(){
+    const libro = libroDestino();
+    const nombreLibro = teclado.libro ? teclado.libro.commonName : null;
+
+    // Pantallita
+    const txt = $('tecladoTexto');
+    if(!teclado.prefijo && !teclado.libro){
+      txt.className = 'teclado-texto pista';
+      txt.textContent = 'Ejemplo: M → Marcos → 1-1';
+    } else {
+      txt.className = 'teclado-texto';
+      // "1S" se muestra "1 S", "MAR" se muestra "Mar"
+      const p = teclado.prefijo;
+      const prefBonito = /^\d/.test(p)
+        ? p.charAt(0) + (p.length > 1 ? ' ' + p.charAt(1) + p.slice(2).toLowerCase() : '')
+        : p.charAt(0) + p.slice(1).toLowerCase();
+      let base = nombreLibro || prefBonito;
+      if(!nombreLibro && libro) base = libro.commonName;   // ya quedó un solo libro
+      txt.textContent = base + (teclado.numeros ? ' ' + teclado.numeros : '');
+      const cursor = document.createElement('span'); cursor.className = 'cursor';
+      txt.appendChild(cursor);
+    }
+
+    // Un solo teclado: fila de números, letras y al final guion y borrar
+    const tec = $('tecladoLetras');
+    tec.innerHTML = '';
+    const modoNombre = escribiendoNumeroDelNombre();   // 1-3 para "1 Samuel"
+    '1234567890'.split('').forEach(d => {
+      let ok;
+      if(modoNombre) ok = teclado.prefijo === '' && candidatos(d).length > 0;
+      else ok = digitoPermitido(d);
+      tec.appendChild(crearTecla(d, 'tecla-num', () => pulsarNumero(d), ok));
+    });
+    // Letras: solo se encienden las que llevan a algún libro
+    const letrasActivas = !libroDefinido() && !teclado.numeros;
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letra => {
+      const sirve = letrasActivas && candidatos(teclado.prefijo + letra).length > 0;
+      tec.appendChild(crearTecla(letra, sirve ? '' : 'vacia', () => pulsarLetra(letra), sirve));
+    });
+    const guionOk = !modoNombre && guionPermitido();
+    tec.appendChild(crearTecla('-', 'tecla-guion doble', pulsarGuion, guionOk, 'Guion: separa capítulo y versículo'));
+    const borrarOk = !!(teclado.numeros || teclado.libro || teclado.prefijo);
+    tec.appendChild(crearTecla('⌫', 'tecla-borrar doble', pulsarBorrar, borrarOk, 'Borrar'));
+
+    // Libros que coinciden: tres por línea, cada uno de un color distinto
+    const COLORES_LIBROS = ['#ffd166', '#7fd8ff', '#9ef08a', '#ff9ecb', '#c7a6ff', '#ffb37a'];
+    const cont = $('tecladoResultados');
+    cont.innerHTML = '';
+    const lista = candidatos(teclado.prefijo);
+    if(teclado.prefijo && lista.length){
+      lista.forEach((b, i) => {
+        const btn = document.createElement('button');
+        const marcado = teclado.libro ? b.id === teclado.libro.id : (lista.length === 1);
+        btn.className = 'libro-resultado' + (marcado ? ' actual' : '') + (b.commonName.length > 12 ? ' largo' : '');
+        btn.style.setProperty('--c', COLORES_LIBROS[i % COLORES_LIBROS.length]);
+        btn.textContent = b.commonName;
+        btn.addEventListener('click', () => elegirLibro(b));
+        cont.appendChild(btn);
+      });
+    }
+
+    // Botón Ir
+    const ir = $('tecladoIr');
+    ir.disabled = !teclado.prefijo && !teclado.libro;
+    if(libro){
+      const [c, v] = teclado.numeros.split('-');
+      ir.textContent = `Ir a ${libro.commonName} ${c || 1}:${v || 1}`;
+    } else {
+      ir.textContent = 'Ir al versículo';
+    }
+  }
+
+  // Teclado físico (computador o teclado bluetooth) mientras el panel está abierto
+  document.addEventListener('keydown', e => {
+    if(!tecladoAbierto()) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if(tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;  // ya lo hace el propio botón
+    if(document.querySelector('.overlay.open')) return;
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if(/^[a-zñ]$/i.test(k)){ pulsarLetra(sinTildes(k)); e.preventDefault(); }
+    else if(/^[0-9]$/.test(k)){ pulsarNumero(k); e.preventDefault(); }
+    else if(k === '-' || k === ':' || k === '.'){ pulsarGuion(); e.preventDefault(); }
+    else if(k === ' '){ /* el espacio no hace falta: se ignora */ e.preventDefault(); }
+    else if(k === 'Backspace'){ pulsarBorrar(); e.preventDefault(); }
+    else if(k === 'Enter'){ irAlVersiculo(); e.preventDefault(); }
+    else if(k === 'Escape'){ cerrarTeclado(); }
+  });
+
+  // ---------- Mis Imágenes ----------
+  const IMAGES_KEY = 'proyector_imagenes_v1';
+
+  function saveImages(){
+    try{
+      localStorage.setItem(IMAGES_KEY, JSON.stringify(state.images));
+      return true;
+    }catch(e){
+      setStatus('No hay espacio para guardar más imágenes. Borra alguna e inténtalo de nuevo.');
+      setTimeout(()=>setStatus(''), 4000);
+      return false;
+    }
+  }
+  function loadImages(){
+    try{
+      const raw = localStorage.getItem(IMAGES_KEY);
+      if(raw) state.images = JSON.parse(raw) || [];
+    }catch(e){ state.images = []; }
+  }
+
+  // Reduce la imagen antes de guardarla, para que ocupe poco espacio
+  function comprimirImagen(file, maxLado, calidad){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let {width, height} = img;
+          if(width > maxLado || height > maxLado){
+            const escala = Math.min(maxLado/width, maxLado/height);
+            width = Math.round(width*escala);
+            height = Math.round(height*escala);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', calidad));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  $('btnImagenes').addEventListener('click', () => { renderImagesGrid(); showScreen('screen-imagenes'); });
+  $('btnSubirImagen').addEventListener('click', () => $('imageFileInput').click());
+
+  $('imageFileInput').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if(!files.length) return;
+    setStatus('Procesando imágenes...');
+    for(const file of files){
+      try{
+        const data = await comprimirImagen(file, 1600, 0.82);
+        state.images.push({
+          id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+          name: file.name.replace(/\.[^.]+$/, ''),
+          data
+        });
+      }catch(err){ /* si una imagen falla, seguimos con las demás */ }
+    }
+    saveImages();
+    renderImagesGrid();
+    renderQuickImages();
+    setStatus('');
+    e.target.value = '';
+  });
+
+  function renderImagesGrid(){
+    const grid = $('imagesGrid');
+    grid.innerHTML = '';
+    $('imagesEmpty').style.display = state.images.length ? 'none' : 'block';
+    state.images.forEach(img => {
+      const card = document.createElement('div');
+      card.className = 'image-card' + (state.currentImage === img.id ? ' selected' : '');
+      const thumb = document.createElement('img');
+      thumb.src = img.data;
+      thumb.alt = img.name;
+      thumb.addEventListener('click', () => proyectarImagen(img.id));
+      const actions = document.createElement('div');
+      actions.className = 'image-actions';
+      const btnProj = document.createElement('button');
+      btnProj.textContent = 'Proyectar';
+      btnProj.addEventListener('click', () => proyectarImagen(img.id));
+      const btnDel = document.createElement('button');
+      btnDel.className = 'del';
+      btnDel.textContent = 'Borrar';
+      btnDel.addEventListener('click', () => borrarImagen(img.id));
+      actions.appendChild(btnProj);
+      actions.appendChild(btnDel);
+      card.appendChild(thumb);
+      card.appendChild(actions);
+      grid.appendChild(card);
+    });
+  }
+
+  function construirMiniaturas(contenedor){
+    contenedor.innerHTML = '';
+
+    // Miniatura "0": vuelve al versículo o canción que estaba proyectado
+    if(state.anterior && state.anterior.modo && state.anterior.modo !== 'empty'){
+      const cero = document.createElement('div');
+      cero.className = 'quick-thumb thumb-cero' + (state.displayMode !== 'image' ? ' active' : '');
+      cero.title = (state.anterior.modo === 'song') ? 'Volver a la canción' : 'Volver al versículo';
+      const icono = document.createElement('span');
+      icono.className = 'cero-icono';
+      icono.textContent = (state.anterior.modo === 'song') ? '♫' : '📖';
+      const numCero = document.createElement('span');
+      numCero.className = 'num';
+      numCero.textContent = '0';
+      cero.appendChild(icono);
+      cero.appendChild(numCero);
+      cero.addEventListener('click', volverAlVersiculo);
+      contenedor.appendChild(cero);
+    }
+
+    state.images.forEach((img, i) => {
+      const cuadro = document.createElement('div');
+      cuadro.className = 'quick-thumb' + (state.currentImage === img.id ? ' active' : '');
+      cuadro.title = img.name || ('Imagen ' + (i+1));
+      const thumb = document.createElement('img');
+      thumb.src = img.data;
+      thumb.alt = img.name || ('Imagen ' + (i+1));
+      const num = document.createElement('span');
+      num.className = 'num';
+      num.textContent = i + 1;
+      cuadro.appendChild(thumb);
+      cuadro.appendChild(num);
+      cuadro.addEventListener('click', () => proyectarImagen(img.id));
+      contenedor.appendChild(cuadro);
+    });
+  }
+
+  function renderQuickImages(){
+    const wrap = $('quickImages');
+    if(!state.images.length){
+      wrap.style.display = 'none';
+      $('panelImages').style.display = 'none';
+      return;
+    }
+    wrap.style.display = 'block';
+    construirMiniaturas($('quickImagesStrip'));
+    construirMiniaturas($('panelImagesStrip'));
+
+    $('panelImages').style.display = (state.displayMode === 'empty') ? 'none' : 'block';
+
+    const actual = state.images.find(i => i.id === state.currentImage);
+    $('quickImagesLabel').textContent = actual
+      ? ('Proyectando: ' + (actual.name || 'imagen'))
+      : 'Toca una imagen para proyectarla';
+  }
+
+  function proyectarImagen(id){
+    const img = state.images.find(i => i.id === id);
+    if(!img) return;
+    // Guardamos lo que estaba proyectado para poder volver después
+    if(state.displayMode !== 'image'){
+      state.anterior = {
+        modo: state.displayMode,
+        texto: $('displayContent').textContent,
+        ref: $('displayRef').textContent
+      };
+    }
+    state.displayMode = 'image';
+    state.currentImage = id;
+    $('displayEmpty').style.display = 'none';
+    $('displayContent').style.display = 'none';
+    $('displayImage').src = img.data;
+    $('displayImage').style.display = 'block';
+    $('displayRef').style.display = 'block';
+    $('displayRef').textContent = img.name || '';
+    $('displayControls').style.display = 'flex';
+    document.body.classList.add('showing-image');
+    renderQuickImages();
+    renderImagesGrid();
+    // Desde la galería de Imágenes: vuelve al inicio y muestra la imagen proyectada.
+    // Desde las miniaturas del inicio: se queda donde estaba, sin saltar.
+    if(!$('screen-home').classList.contains('active')){
+      showScreen('screen-home');
+      if(!document.body.classList.contains('projecting')){
+        $('displayPanel').scrollIntoView({block:'center'});
+      }
+    }
+  }
+
+  // Vuelve al versículo (o canción) que estaba proyectado antes de la imagen
+  function volverAlVersiculo(){
+    const prev = state.anterior;
+    $('displayImage').style.display = 'none';
+    document.body.classList.remove('showing-image');
+    state.currentImage = null;
+    if(prev && prev.modo && prev.modo !== 'empty'){
+      state.displayMode = prev.modo;
+      $('displayContent').textContent = prev.texto;
+      $('displayRef').textContent = prev.ref;
+      $('displayContent').style.display = 'block';
+      $('displayRef').style.display = 'block';
+    } else {
+      state.displayMode = 'verse';
+      $('displayContent').style.display = 'block';
+    }
+    renderQuickImages();
+    renderImagesGrid();
+  }
+
+  function borrarImagen(id){
+    const estabaProyectada = (state.currentImage === id);
+    state.images = state.images.filter(i => i.id !== id);
+    if(estabaProyectada && state.displayMode === 'image'){
+      volverAlVersiculo();
+    }
+    saveImages();
+    renderImagesGrid();
+    renderQuickImages();
+  }
+
+  // Al proyectar un versículo o una canción, se oculta la imagen
+  function ocultarImagenProyectada(){
+    $('displayImage').style.display = 'none';
+    document.body.classList.remove('showing-image');
+    state.currentImage = null;
+    state.anterior = null;
+    renderQuickImages();
+  }
 
   // ---------- Ajustes preview live update ----------
   const previewObserver = () => {
@@ -1122,6 +1875,8 @@ window.BIBLE_DATA = [{"name": "Génesis", "chapters": [["En el principio crió D
   $('colorBg').addEventListener('input', previewObserver);
   document.querySelectorAll('input[name=fontfam]').forEach(r => r.addEventListener('change', previewObserver));
 
+  loadImages();
+  renderQuickImages();
   init();
   previewObserver();
   applySize(32);
