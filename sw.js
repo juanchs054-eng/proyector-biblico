@@ -1,35 +1,36 @@
-const CACHE_NAME = 'proyector-biblico-rv-v1.2';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
-];
+// Service worker con actualización automática.
+// Estrategia "primero la red": si hay internet siempre trae la versión nueva
+// y la guarda; si no hay internet usa la copia guardada (funciona sin conexión).
+const CACHE = 'proyector-biblico-cache';
+const BASE = ['./', 'index.html', 'manifest.json', 'icon-192.png'];
 
-// Instala y cachea todo lo necesario para funcionar 100% offline
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+self.addEventListener('install', e => {
+  self.skipWaiting(); // la versión nueva toma el control de inmediato
+  e.waitUntil(
+    caches.open(CACHE).then(c => Promise.all(
+      BASE.map(u => fetch(u, {cache:'reload'}).then(r => r.ok && c.put(u, r)).catch(()=>{}))
+    ))
   );
-  self.skipWaiting();
 });
 
-// Limpia caches viejos cuando se actualiza la app
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Sirve todo desde cache primero (app-shell), sin depender de internet
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).catch(() => caches.match('./index.html'));
-    })
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if(req.method !== 'GET' || !req.url.startsWith('http')) return;
+  e.respondWith(
+    fetch(req, {cache:'no-store'}).then(res => {
+      if(res && res.ok && new URL(req.url).origin === location.origin){
+        const copia = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copia));
+      }
+      return res;
+    }).catch(() => caches.match(req).then(r => r || caches.match('index.html')))
   );
 });
